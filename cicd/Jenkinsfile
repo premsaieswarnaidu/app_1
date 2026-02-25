@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        DOCKER_USER = 'premkoredla'
+        FRONTEND_IMAGE = "${DOCKER_USER}/frontend"
+        BACKEND_IMAGE = "${DOCKER_USER}/backend"
+        KUBECONFIG = credentials('kubeconfig-creds')
+    }
+
+    stages {
+        stage('Lint') {
+            steps {
+                sh 'npm install --prefix frontend && npm run lint --prefix frontend'
+                sh 'npm install --prefix backend && npm run lint --prefix backend'
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh 'npm test --prefix frontend'
+                sh 'npm test --prefix backend'
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh "docker build -t $FRONTEND_IMAGE:${BUILD_NUMBER} ./frontend"
+                sh "docker build -t $BACKEND_IMAGE:${BUILD_NUMBER} ./backend"
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
+                    sh "docker push $FRONTEND_IMAGE:${BUILD_NUMBER}"
+                    sh "docker push $BACKEND_IMAGE:${BUILD_NUMBER}"
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
+                    sh """
+                    kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE:${BUILD_NUMBER} -n default
+                    kubectl set image deployment/backend backend=$BACKEND_IMAGE:${BUILD_NUMBER} -n default
+                    kubectl rollout status deployment/frontend -n default
+                    kubectl rollout status deployment/backend -n default
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'Pipeline failed! Rolling back...'
+            withKubeConfig([credentialsId: 'kubeconfig-creds']) {
+                sh "kubectl rollout undo deployment/frontend -n default"
+                sh "kubectl rollout undo deployment/backend -n default"
+            }
+        }
+    }
+}

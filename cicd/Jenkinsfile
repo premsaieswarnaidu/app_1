@@ -63,33 +63,19 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            agent {
-                docker {
-                    image 'bitnami/kubectl:latest'
-                }
-            }
+        stage('Update Manifests in Git') {
+            agent { label 'docker' }
             steps {
-                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
-                    sh """
-                    kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE:${BUILD_NUMBER} -n default
-                    kubectl set image deployment/backend backend=$BACKEND_IMAGE:${BUILD_NUMBER} -n default
-                    kubectl rollout status deployment/frontend -n default
-                    kubectl rollout status deployment/backend -n default
-                    """
-                }
-            }
-        }
-    }
+                sh """
+                sed -i 's|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${BUILD_NUMBER}|' manifests/frontend-deployment.yaml
+                sed -i 's|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${BUILD_NUMBER}|' manifests/backend-deployment.yaml
 
-    post {
-        failure {
-            steps {
-                echo 'Pipeline failed! Rolling back...'
-                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
-                    sh "kubectl rollout undo deployment/frontend -n default"
-                    sh "kubectl rollout undo deployment/backend -n default"
-                }
+                git config --global user.email ""
+                git config --global user.name ""
+                git add manifests/*.yaml
+                git commit -m "Update images to build ${BUILD_NUMBER}"
+                git push origin main
+                """
             }
         }
     }

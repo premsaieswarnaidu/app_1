@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: premkoredla/frontend:latest
+        image: premkoredla/frontend:v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

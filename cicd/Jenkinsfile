@@ -1,16 +1,20 @@
 pipeline {
-    agent any
+    agent none   // no global agent, each stage defines its own
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         DOCKER_USER = 'premkoredla'
         FRONTEND_IMAGE = "${DOCKER_USER}/frontend"
         BACKEND_IMAGE = "${DOCKER_USER}/backend"
-        KUBECONFIG = credentials('kubeconfig-creds')
     }
 
     stages {
         stage('Lint') {
+            agent {
+                docker {
+                    image 'node:18'
+                }
+            }
             steps {
                 sh 'npm install --prefix frontend && npm run lint --prefix frontend'
                 sh 'npm install --prefix backend && npm run lint --prefix backend'
@@ -18,6 +22,11 @@ pipeline {
         }
 
         stage('Unit Tests') {
+            agent {
+                docker {
+                    image 'node:18'
+                }
+            }
             steps {
                 sh 'npm test --prefix frontend'
                 sh 'npm test --prefix backend'
@@ -25,6 +34,12 @@ pipeline {
         }
 
         stage('Build Docker Images') {
+            agent {
+                docker {
+                    image 'docker:24.0'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
                 sh "docker build -t $FRONTEND_IMAGE:${BUILD_NUMBER} ./frontend"
                 sh "docker build -t $BACKEND_IMAGE:${BUILD_NUMBER} ./backend"
@@ -32,6 +47,12 @@ pipeline {
         }
 
         stage('Push to Docker Hub') {
+            agent {
+                docker {
+                    image 'docker:24.0'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
                 withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
                     sh "docker push $FRONTEND_IMAGE:${BUILD_NUMBER}"
@@ -41,6 +62,11 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
+            agent {
+                docker {
+                    image 'bitnami/kubectl:latest'
+                }
+            }
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig-creds']) {
                     sh """
@@ -56,10 +82,17 @@ pipeline {
 
     post {
         failure {
-            echo 'Pipeline failed! Rolling back...'
-            withKubeConfig([credentialsId: 'kubeconfig-creds']) {
-                sh "kubectl rollout undo deployment/frontend -n default"
-                sh "kubectl rollout undo deployment/backend -n default"
+            agent {
+                docker {
+                    image 'bitnami/kubectl:latest'
+                }
+            }
+            steps {
+                echo 'Pipeline failed! Rolling back...'
+                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
+                    sh "kubectl rollout undo deployment/frontend -n default"
+                    sh "kubectl rollout undo deployment/backend -n default"
+                }
             }
         }
     }

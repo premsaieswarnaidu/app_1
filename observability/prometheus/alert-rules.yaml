@@ -1,10 +1,17 @@
-groups:
-- name: app-alerts
-  rules:
-  - alert: HighErrorRate
-    expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.05
-    for: 2m
-    labels:
-      severity: critical
-    annotations:
-      description: "High error rate detected in backend"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-rules
+  namespace: observability
+data:
+  alert-rules.yaml: |
+    groups:
+    - name: app-alerts
+      rules:
+      - alert: HighErrorRate
+        expr: rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          description: "High error rate detected in backend"

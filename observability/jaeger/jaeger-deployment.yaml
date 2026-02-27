@@ -18,4 +18,6 @@ spec:
         image: jaegertracing/all-in-one:1.55
         ports:
         - containerPort: 16686 # UI
-        - containerPort: 6831  # UDP for traces
+        - containerPort: 14268 # Collector
+        - containerPort: 14250 # gRPC
+        - containerPort: 6831  # UDP

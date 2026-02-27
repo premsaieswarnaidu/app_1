@@ -6,16 +6,54 @@ metadata:
   labels:
     grafana_dashboard: "1"
 data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /etc/grafana/provisioning/dashboards
   backend-dashboard.json: |
     {
       "title": "Backend Performance",
       "panels": [
         {
           "type": "graph",
-          "title": "Request Duration",
+          "title": "Request Rate",
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count[1m])) by (route)"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "title": "Average Request Duration",
           "targets": [
             {
               "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "title": "Latency (p95)",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "title": "Error Rate (%)",
+          "targets": [
+            {
+              "expr": "(sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))) * 100"
             }
           ]
         }

@@ -13,3 +13,6 @@ spec:
   - name: collector
     port: 14268
     targetPort: 14268
+  - name: grpc
+    port: 14250
+    targetPort: 14250

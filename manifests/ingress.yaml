@@ -2,7 +2,14 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: app-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: nginx
 spec:
+  tls:
+  - hosts:
+    - myapp.local
+    secretName: frontend-tls
   rules:
   - host: myapp.local
     http:

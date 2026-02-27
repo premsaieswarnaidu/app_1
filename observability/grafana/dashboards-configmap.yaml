@@ -46,7 +46,26 @@ data:
             {
               "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))"
             }
-          ]
+          ],
+          "thresholds": [
+            {
+              "value": 0.2,
+              "colorMode": "critical",
+              "line": true,
+              "op": "gt"
+            }
+          ],
+          "alert": {
+            "name": "LatencySLOBreached",
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)) > 0.2",
+            "for": "5m",
+            "labels": {
+              "severity": "critical"
+            },
+            "annotations": {
+              "description": "Latency SLO breached: p95 > 200ms"
+            }
+          }
         },
         {
           "type": "graph",
@@ -55,7 +74,26 @@ data:
             {
               "expr": "(sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))) * 100"
             }
-          ]
+          ],
+          "thresholds": [
+            {
+              "value": 1,
+              "colorMode": "critical",
+              "line": true,
+              "op": "gt"
+            }
+          ],
+          "alert": {
+            "name": "ErrorRateSLOBreached",
+            "expr": "(sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))) * 100 > 1",
+            "for": "5m",
+            "labels": {
+              "severity": "critical"
+            },
+            "annotations": {
+              "description": "Error rate SLO breached: > 1%"
+            }
+          }
         }
       ]
     }

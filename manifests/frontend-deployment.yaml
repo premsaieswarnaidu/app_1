@@ -19,7 +19,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: frontend
-        image: premkoredla/frontend:a439c720410ac53ef1f63d0ed30108a8e0998be7
+        image: premkoredla/frontend:0f5f99666b952b7eadd5154385aedaf63401153d
         imagePullPolicy: Always
         ports:
         - containerPort: 80

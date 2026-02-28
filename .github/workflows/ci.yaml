@@ -1,7 +1,6 @@
 name: CI Pipeline
 
 on:
-  # Trigger on push to develop (after PR merge)
   push:
     branches:
       - develop
@@ -15,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       # ------------------------- Checkout -------------------------
@@ -68,8 +68,8 @@ jobs:
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
           format: 'table'
-          exit-code: '0'       # only fail on actual vulnerabilities
-          scanners: 'vuln'     # skip secret scanning
+          exit-code: '0'
+          scanners: 'vuln'
 
       - name: Build Frontend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
@@ -98,20 +98,41 @@ jobs:
         run: |
           sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
 
-      - name: Commit Updated Manifests to develop
+      # ------------------------- Commit to CI branch -----------------
+      - name: Create CI Branch and Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+          CI_BRANCH="develop-ci-${GITHUB_SHA::7}"
+          git checkout -b $CI_BRANCH
           git add manifests/
           git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
-          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/premsaieswarnaidu/app_1.git HEAD:develop
+          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} HEAD:$CI_BRANCH
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
+      # ------------------------- Create Pull Request -----------------
+      - name: Create PR from CI branch
+        id: create_pr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.CI_SUPER_USER }}
+          commit-message: "Update images via CI"
+          branch: ${{ github.sha }}
+          base: develop
+          head: develop-ci-${{ github.sha::7 }}
+          title: "CI: Update images to ${{ github.sha }}"
+          body: "This PR was automatically created by CI to update backend and frontend images."
+          draft: false
+          auto-merge: true        # Auto merge once all checks pass
 
       # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main
+        if: ${{ steps.create_pr.outputs.pull-request-number != '' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CI_SUPER_USER }}
         run: |
           git fetch origin main
           git checkout main
           git merge --no-ff develop -m "Merge develop into main after successful CI"
-          git push origin main
+          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} main

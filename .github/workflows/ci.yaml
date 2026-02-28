@@ -50,9 +50,9 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
-          format: 'table'
+          format: table
           exit-code: '0'
-          scanners: 'vuln'
+          scanners: vuln
 
       - name: Build Frontend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
@@ -61,9 +61,9 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
-          format: 'table'
+          format: table
           exit-code: '0'
-          scanners: 'vuln'
+          scanners: vuln
 
       - name: Push Backend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}

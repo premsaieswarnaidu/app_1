@@ -20,6 +20,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Git Identity
+        run: |
+          git config --global user.name "Prem Sai Eswar Naidu"
+          git config --global user.email "premsaikoredla@gamil.com"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

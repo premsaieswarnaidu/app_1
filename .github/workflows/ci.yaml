@@ -3,31 +3,32 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - main
+      - develop      # trigger CI on develop branch
     paths:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/**'
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
+      # Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Setup Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       # ==========================
-      # BACKEND QUALITY CHECKS
+      # BACKEND
       # ==========================
-
       - name: Install Backend Dependencies
         run: |
           cd backend
@@ -44,41 +45,52 @@ jobs:
           npm test
 
       # ==========================
+      # FRONTEND
+      # ==========================
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm run build
+
+      # ==========================
       # DOCKER LOGIN
       # ==========================
-
       - name: Login to Docker Hub
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       # ==========================
-      # BUILD & PUSH BACKEND
+      # CONTAINER IMAGE SCAN & SIGNING
       # ==========================
-
-      - name: Build Backend Image
+      - name: Scan Backend Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend
+          docker scan ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
 
+      - name: Scan Frontend Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
+          docker scan ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
+
+      # ==========================
+      # PUSH IMAGES
+      # ==========================
       - name: Push Backend Image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
-
-      # ==========================
-      # BUILD & PUSH FRONTEND
-      # ==========================
-
-      - name: Build Frontend Image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
 
       - name: Push Frontend Image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
       # ==========================
-      # UPDATE MANIFESTS
+      # UPDATE MANIFESTS (develop branch)
       # ==========================
-
       - name: Update Backend Manifest
         run: |
           sed -i "s|image:.*backend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}|" manifests/backend-deployment.yaml
@@ -87,14 +99,23 @@ jobs:
         run: |
           sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
 
-      # ==========================
-      # COMMIT CHANGES
-      # ==========================
-
-      - name: Commit and Push Updated Manifests
+      - name: Commit Updated Manifests to develop
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add manifests/
           git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
           git push
+
+      # ==========================
+      # MERGE develop -> main
+      # ==========================
+      - name: Merge develop into main
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin main
+          git checkout main
+          git merge --no-ff develop -m "Merge develop into main after successful CI"
+          git push origin main

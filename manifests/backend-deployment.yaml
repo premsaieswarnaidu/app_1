@@ -19,7 +19,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: backend
-        image: premkoredla/backend:a439c720410ac53ef1f63d0ed30108a8e0998be7
+        image: premkoredla/backend:3c9ddbee561092bf47bd6ba998d1dcca30f451a8
         imagePullPolicy: Always
         ports:
         - containerPort: 5000

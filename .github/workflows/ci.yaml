@@ -17,49 +17,32 @@ jobs:
       pull-requests: write
 
     steps:
-      # ------------------------- Checkout -------------------------
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ------------------------- Setup Node ------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ------------------------- Backend --------------------------
       - name: Install Backend Dependencies
-        run: |
-          cd backend
-          npm install
+        run: cd backend && npm install
 
       - name: Run Backend Linter
-        run: |
-          cd backend
-          npm run lint
+        run: cd backend && npm run lint
 
       - name: Run Backend Unit & Integration Tests
-        run: |
-          cd backend
-          npm test
+        run: cd backend && npm test
 
-      # ------------------------- Frontend -------------------------
       - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm install
+        run: cd frontend && npm install
 
       - name: Build Frontend
-        run: |
-          cd frontend
-          npm run build
+        run: cd frontend && npm run build
 
-      # ------------------------- Docker Login ---------------------
       - name: Login to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # ------------------------- Build & Scan Images ----------------
       - name: Build Backend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend
 
@@ -82,23 +65,18 @@ jobs:
           exit-code: '0'
           scanners: 'vuln'
 
-      # ------------------------- Push Images -----------------------
       - name: Push Backend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
 
       - name: Push Frontend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
-      # ------------------------- Update Manifests -----------------
       - name: Update Backend Manifest
-        run: |
-          sed -i "s|image:.*backend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}|" manifests/backend-deployment.yaml
+        run: sed -i "s|image:.*backend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}|" manifests/backend-deployment.yaml
 
       - name: Update Frontend Manifest
-        run: |
-          sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
+        run: sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
 
-      # ------------------------- Create PR -----------------
       - name: Create PR from CI branch
         id: create_pr
         uses: peter-evans/create-pull-request@v5
@@ -110,8 +88,9 @@ jobs:
           title: "CI: Update images to ${{ github.sha }}"
           body: "This PR was automatically created by CI to update backend and frontend images."
           draft: false
+          add-paths: |
+            manifests/
 
-      # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main
         if: ${{ steps.create_pr.outputs.pull-request-number }}
         run: |

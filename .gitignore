@@ -1,0 +1,13 @@
+# Trivy cache
+.cache/
+
+# Coverage reports
+coverage/
+backend/coverage/
+frontend/coverage/
+
+# Node modules (in case)
+**/node_modules/
+
+# Build artifacts
+frontend/build/

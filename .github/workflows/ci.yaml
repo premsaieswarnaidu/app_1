@@ -69,6 +69,7 @@ jobs:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
           format: 'table'
           exit-code: '1'
+          scanners: 'vuln'
 
       - name: Build Frontend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend

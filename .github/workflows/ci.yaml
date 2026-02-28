@@ -98,12 +98,12 @@ jobs:
         run: |
           sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
 
-      # Step: create CI branch and commit
+      # ------------------------- Create CI Branch and Commit -----------------
       - name: Create CI Branch and Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          SHORT_SHA=${GITHUB_SHA:0:7}           # bash substring
+          SHORT_SHA=${GITHUB_SHA:0:7}
           CI_BRANCH="develop-ci-$SHORT_SHA"
           echo "CI_BRANCH=$CI_BRANCH" >> $GITHUB_ENV
           git checkout -b $CI_BRANCH
@@ -113,8 +113,9 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
 
-      # Step: create PR
+      # ------------------------- Create PR -----------------
       - name: Create PR from CI branch
+        id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
@@ -124,13 +125,10 @@ jobs:
           title: "CI: Update images to ${{ github.sha }}"
           body: "This PR was automatically created by CI to update backend and frontend images."
           draft: false
-          push-to-fork: false             
 
       # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main
-        if: ${{ steps.create_pr.outputs.pull-request-number != '' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.CI_SUPER_USER }}
+        if: ${{ steps.create_pr.outputs.pull-request-number }}
         run: |
           git fetch origin main
           git checkout main

@@ -21,7 +21,7 @@ jobs:
           node-version: 20
 
       # ==========================
-      # BACKEND
+      # BACKEND QUALITY CHECKS
       # ==========================
 
       - name: Install Backend Dependencies
@@ -29,10 +29,15 @@ jobs:
           cd backend
           npm install
 
-      - name: Run Backend Tests
+      - name: Run Linter
         run: |
           cd backend
-          npm test || true
+          npm run lint
+
+      - name: Run Unit & Integration Tests
+        run: |
+          cd backend
+          npm test
 
       # ==========================
       # DOCKER LOGIN
@@ -87,5 +92,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add manifests/
-          git commit -m "Update backend & frontend images to ${{ github.sha }}" || echo "No changes"
+          git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
           git push

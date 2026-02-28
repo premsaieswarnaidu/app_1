@@ -72,10 +72,12 @@ jobs:
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
       - name: Update Backend Manifest
-        run: sed -i "s|image:.*backend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}|" manifests/backend-deployment.yaml
+        run: |
+          sed -i 's|image:.*backend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}"'|' manifests/backend-deployment.yaml
 
       - name: Update Frontend Manifest
-        run: sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
+        run: |
+          sed -i 's|image:.*frontend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}"'|' manifests/frontend-deployment.yaml
 
       - name: Create PR from CI branch
         id: create_pr

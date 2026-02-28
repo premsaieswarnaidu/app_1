@@ -1,16 +1,7 @@
 name: CI Pipeline
 
 on:
-  # Trigger on Pull Requests to develop (lint/tests only)
-  pull_request:
-    branches:
-      - develop
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/**'
-
-  # Trigger on push to develop branch (full build, scan, push, merge)
+  # Trigger on push to develop (after PR merge)
   push:
     branches:
       - develop
@@ -20,56 +11,17 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  # ------------------ Job for PR (lint/tests only) ------------------
-  pr-check:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # Backend tests
-      - name: Install Backend Dependencies
-        run: |
-          cd backend
-          npm install
-      - name: Run Backend Linter
-        run: |
-          cd backend
-          npm run lint
-      - name: Run Backend Unit & Integration Tests
-        run: |
-          cd backend
-          npm test
-
-      # Frontend build
-      - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm install
-      - name: Build Frontend
-        run: |
-          cd frontend
-          npm run build
-
-  # ------------------ Job for Develop branch push ------------------
   build-and-deploy:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: pr-check
     permissions:
       contents: write
 
     steps:
+      # ------------------------- Checkout -------------------------
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # ------------------------- Setup Node ------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

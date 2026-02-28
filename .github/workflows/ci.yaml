@@ -20,7 +20,7 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  # ------------------ PR Job (Lint & Test only) ------------------
+  # ------------------ Job for PR (lint/tests only) ------------------
   pr-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -34,37 +34,35 @@ jobs:
         with:
           node-version: 20
 
-      # Backend
+      # Backend tests
       - name: Install Backend Dependencies
         run: |
           cd backend
           npm install
-
       - name: Run Backend Linter
         run: |
           cd backend
           npm run lint
-
       - name: Run Backend Unit & Integration Tests
         run: |
           cd backend
           npm test
 
-      # Frontend
+      # Frontend build
       - name: Install Frontend Dependencies
         run: |
           cd frontend
           npm install
-
       - name: Build Frontend
         run: |
           cd frontend
           npm run build
 
-  # ------------------ Build & Deploy Job ------------------
+  # ------------------ Job for Develop branch push ------------------
   build-and-deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    needs: pr-check
     permissions:
       contents: write
 

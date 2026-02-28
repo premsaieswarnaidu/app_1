@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: premkoredla/backend:105c48584fe6727bcfa54c2d6ba0468bd2ad5536
+        image: premkoredla/backend:2480852f430fbf06f933d786327189ed15a33588
         ports:
         - containerPort: 5000
         envFrom:

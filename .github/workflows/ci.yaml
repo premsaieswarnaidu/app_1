@@ -104,7 +104,7 @@ jobs:
           git config user.email "actions@github.com"
           git add manifests/
           git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
-          git push https://x-access-token:${{ secrets.CI-super-user }}@github.com/premsaieswarnaidu/app_1.git HEAD:develop
+          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/premsaieswarnaidu/app_1.git HEAD:develop
 
       # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main

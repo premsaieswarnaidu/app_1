@@ -98,5 +98,5 @@ jobs:
         run: |
           git fetch origin main
           git checkout main
-          git merge --no-ff develop -m "Merge develop into main after successful CI"
+          git merge --no-ff develop -m "Merge develop into main after successful CI" --allow-unrelated-histories
           git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} main

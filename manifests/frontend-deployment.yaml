@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: premkoredla/frontend:v2
+        image: premkoredla/frontend:cdd8c73ef18e29d77b762a965e55e314605bf8e2
         ports:
         - containerPort: 80

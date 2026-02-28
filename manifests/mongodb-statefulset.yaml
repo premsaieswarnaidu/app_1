@@ -27,6 +27,10 @@ spec:
         volumeMounts:
         - name: mongo-pv
           mountPath: /data/db
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: run-volume
+          mountPath: /var/run
         env:
         - name: MONGO_INITDB_ROOT_USERNAME
           valueFrom:
@@ -68,6 +72,11 @@ spec:
           runAsUser: 999
           runAsGroup: 999
           readOnlyRootFilesystem: true
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: run-volume
+        emptyDir: {}
   volumeClaimTemplates:
   - metadata:
       name: mongo-pv

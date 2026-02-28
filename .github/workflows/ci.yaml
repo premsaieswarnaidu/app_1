@@ -103,7 +103,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          CI_BRANCH="develop-ci-${GITHUB_SHA::7}"
+          CI_BRANCH="develop-ci-$SHORT_SHA"
           git checkout -b $CI_BRANCH
           git add manifests/
           git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
@@ -120,7 +120,7 @@ jobs:
           commit-message: "Update images via CI"
           branch: ${{ github.sha }}
           base: develop
-          head: develop-ci-${{ github.sha::7 }}
+          head: develop-ci-${{ github.sha }}
           title: "CI: Update images to ${{ github.sha }}"
           body: "This PR was automatically created by CI to update backend and frontend images."
           draft: false

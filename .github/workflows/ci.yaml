@@ -1,9 +1,9 @@
 name: CI Pipeline
 
 on:
-  push:
+  pull_request:
     branches:
-      - develop      # trigger CI on develop branch
+      - develop
     paths:
       - 'backend/**'
       - 'frontend/**'
@@ -16,19 +16,17 @@ jobs:
       contents: write
 
     steps:
-      # Checkout Code
+      # ------------------------- Checkout -------------------------
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Setup Node
+      # ------------------------- Setup Node ------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ==========================
-      # BACKEND
-      # ==========================
+      # ------------------------- Backend --------------------------
       - name: Install Backend Dependencies
         run: |
           cd backend
@@ -44,9 +42,7 @@ jobs:
           cd backend
           npm test
 
-      # ==========================
-      # FRONTEND
-      # ==========================
+      # ------------------------- Frontend -------------------------
       - name: Install Frontend Dependencies
         run: |
           cd frontend
@@ -57,29 +53,23 @@ jobs:
           cd frontend
           npm run build
 
-      # ==========================
-      # DOCKER LOGIN
-      # ==========================
+      # ------------------------- Docker Login ---------------------
       - name: Login to Docker Hub
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # ==========================
-      # CONTAINER IMAGE SCAN & SIGNING
-      # ==========================
-      - name: Scan Backend Image
+      # ------------------------- Build & Scan Images ----------------
+      - name: Build & Scan Backend Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend
-          docker scan ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
+          docker scan --accept-license ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
 
-      - name: Scan Frontend Image
+      - name: Build & Scan Frontend Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
-          docker scan ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
+          docker scan --accept-license ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
-      # ==========================
-      # PUSH IMAGES
-      # ==========================
+      # ------------------------- Push Images -----------------------
       - name: Push Backend Image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
@@ -88,9 +78,7 @@ jobs:
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
-      # ==========================
-      # UPDATE MANIFESTS (develop branch)
-      # ==========================
+      # ------------------------- Update Manifests -----------------
       - name: Update Backend Manifest
         run: |
           sed -i "s|image:.*backend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}|" manifests/backend-deployment.yaml
@@ -107,9 +95,7 @@ jobs:
           git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
           git push
 
-      # ==========================
-      # MERGE develop -> main
-      # ==========================
+      # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main
         if: success()
         env:

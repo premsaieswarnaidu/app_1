@@ -18,12 +18,15 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+
       containers:
       - name: mongodb
         image: mongo:6
         imagePullPolicy: Always
+
         ports:
         - containerPort: 27017
+
         volumeMounts:
         - name: mongo-pv
           mountPath: /data/db
@@ -31,6 +34,7 @@ spec:
           mountPath: /tmp
         - name: run-volume
           mountPath: /var/run
+
         env:
         - name: MONGO_INITDB_ROOT_USERNAME
           valueFrom:
@@ -51,31 +55,23 @@ spec:
             cpu: "500m"
             memory: "1Gi"
 
+        # LIVENESS PROBE (TCP)
         livenessProbe:
-          exec:
-            command:
-              - sh
-              - -c
-              - >
-                mongo -u "$MONGO_INITDB_ROOT_USERNAME"
-                -p "$MONGO_INITDB_ROOT_PASSWORD"
-                --authenticationDatabase admin
-                --eval "db.adminCommand('ping')"
+          tcpSocket:
+            port: 27017
           initialDelaySeconds: 30
-          periodSeconds: 30
-
-        readinessProbe:
-          exec:
-            command:
-              - sh
-              - -c
-              - >
-                mongo -u "$MONGO_INITDB_ROOT_USERNAME"
-                -p "$MONGO_INITDB_ROOT_PASSWORD"
-                --authenticationDatabase admin
-                --eval "db.adminCommand('ping')"
-          initialDelaySeconds: 10
           periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # READINESS PROBE (TCP)
+        readinessProbe:
+          tcpSocket:
+            port: 27017
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
 
         securityContext:
           allowPrivilegeEscalation: false
@@ -83,7 +79,7 @@ spec:
             drop: ["ALL"]
           runAsUser: 999
           runAsGroup: 999
-          readOnlyRootFilesystem: false   # IMPORTANT: Mongo needs write access
+          readOnlyRootFilesystem: false
 
       volumes:
       - name: tmp-volume

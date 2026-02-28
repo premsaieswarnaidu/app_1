@@ -115,16 +115,16 @@ jobs:
 
       # Step: create PR
       - name: Create PR from CI branch
-        id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
           commit-message: "Update images via CI"
-          branch: ${{ env.CI_BRANCH }}           # use exported env variable
+          branch: ${{ env.CI_BRANCH }}
           base: develop
           title: "CI: Update images to ${{ github.sha }}"
           body: "This PR was automatically created by CI to update backend and frontend images."
           draft: false
+          push-to-fork: false             
 
       # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main

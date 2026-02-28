@@ -23,14 +23,36 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
+
         envFrom:
         - configMapRef:
             name: backend-config
+
         env:
+        - name: MONGO_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+
+        - name: MONGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+
+        - name: MONGO_HOST
+          value: "mongodb"
+
+        - name: MONGO_DB
+          value: "usersdb"
+
         - name: JAEGER_AGENT_HOST
           value: "localhost"
+
         - name: JAEGER_AGENT_PORT
           value: "6831"
+
         resources:
           requests:
             cpu: "250m"
@@ -38,18 +60,21 @@ spec:
           limits:
             cpu: "500m"
             memory: "512Mi"
+
         livenessProbe:
           httpGet:
             path: /health
             port: 5000
           initialDelaySeconds: 10
           periodSeconds: 30
+
         readinessProbe:
           httpGet:
             path: /ready
             port: 5000
           initialDelaySeconds: 5
           periodSeconds: 10
+
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -57,6 +82,7 @@ spec:
           runAsUser: 1000
           runAsGroup: 1000
           readOnlyRootFilesystem: true
+
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:1.55
         args:

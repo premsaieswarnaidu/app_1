@@ -56,13 +56,13 @@ app.post("/api/register", async (req, res) => {
     await user.save();
     res.status(201).json({ message: "User registered" });
   } catch (err) {
+    console.error("Register error:", err);
     res.status(500).json({ error: "Failed to register user" });
   }
 });
 
 // Get all users
 app.get("/api/users", async (req, res) => {
-  // If running tests, return mock data immediately
   if (process.env.NODE_ENV === "test") {
     return res.status(200).json([]);
   }
@@ -71,11 +71,12 @@ app.get("/api/users", async (req, res) => {
     const users = await User.find();
     res.status(200).json(users);
   } catch (err) {
+    console.error("Fetch users error:", err);
     res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
-// Health endpoint (JSON for tests)
+// Health endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
@@ -93,14 +94,22 @@ app.get("/metrics", async (req, res) => {
 
 /* ================================
    Server + DB Startup
-   (Disabled During Tests)
 ================================ */
 
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== "test") {
+  const {
+    MONGO_USERNAME,
+    MONGO_PASSWORD,
+    MONGO_HOST,
+    MONGO_DB,
+  } = process.env;
+
+  const mongoURI = `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:27017/${MONGO_DB}?authSource=admin`;
+
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(mongoURI)
     .then(() => {
       console.log("MongoDB connected");
       app.listen(PORT, "0.0.0.0", () =>

@@ -13,14 +13,24 @@ spec:
       labels:
         app: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: backend
         image: premkoredla/backend:0000c436a1c128688f3cde2dd033633e7891a5c2
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         envFrom:
         - configMapRef:
             name: backend-config
+        env:
+        - name: JAEGER_AGENT_HOST
+          value: "localhost"
+        - name: JAEGER_AGENT_PORT
+          value: "6831"
         resources:
           requests:
             cpu: "250m"
@@ -32,15 +42,21 @@ spec:
           httpGet:
             path: /health
             port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /ready
             port: 5000
-        env:
-        - name: JAEGER_AGENT_HOST
-          value: "localhost"
-        - name: JAEGER_AGENT_PORT
-          value: "6831"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:1.55
         args:
@@ -48,3 +64,10 @@ spec:
         ports:
         - containerPort: 6831
           protocol: UDP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true

@@ -58,7 +58,7 @@ jobs:
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # ------------------------- Build & Scan Images ----------------
+      # ------------------------- Build && Scan Images ----------------
       - name: Build & Scan Backend Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend

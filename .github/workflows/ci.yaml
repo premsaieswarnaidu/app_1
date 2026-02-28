@@ -98,33 +98,33 @@ jobs:
         run: |
           sed -i "s|image:.*frontend.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}|" manifests/frontend-deployment.yaml
 
-      # ------------------------- Commit to CI branch -----------------
+      # Step: create CI branch and commit
       - name: Create CI Branch and Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+          SHORT_SHA=${GITHUB_SHA:0:7}           # bash substring
           CI_BRANCH="develop-ci-$SHORT_SHA"
+          echo "CI_BRANCH=$CI_BRANCH" >> $GITHUB_ENV
           git checkout -b $CI_BRANCH
           git add manifests/
-          git commit -m "Update images to ${{ github.sha }}" || echo "No changes"
+          git commit -m "Update images to $GITHUB_SHA" || echo "No changes"
           git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} HEAD:$CI_BRANCH
         env:
           GITHUB_SHA: ${{ github.sha }}
 
-      # ------------------------- Create Pull Request -----------------
+      # Step: create PR
       - name: Create PR from CI branch
         id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
           commit-message: "Update images via CI"
-          branch: ${{ github.sha }}
+          branch: ${{ env.CI_BRANCH }}           # use exported env variable
           base: develop
-          head: develop-ci-${{ github.sha }}
           title: "CI: Update images to ${{ github.sha }}"
           body: "This PR was automatically created by CI to update backend and frontend images."
           draft: false
-          auto-merge: true        # Auto merge once all checks pass
 
       # ------------------------- Merge develop -> main -----------------
       - name: Merge develop into main

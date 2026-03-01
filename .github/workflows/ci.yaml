@@ -17,8 +17,11 @@ jobs:
       pull-requests: write
 
     steps:
+      #  Fetch full history so main branch is available
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Git Identity
         run: |
@@ -30,6 +33,7 @@ jobs:
         with:
           node-version: 20
 
+      # ───── BACKEND ─────
       - name: Install Backend Dependencies
         run: cd backend && npm install
 
@@ -39,15 +43,18 @@ jobs:
       - name: Run Backend Unit & Integration Tests
         run: cd backend && npm test
 
+      # ───── FRONTEND ─────
       - name: Install Frontend Dependencies
         run: cd frontend && npm install
 
       - name: Build Frontend
         run: cd frontend && npm run build
 
+      # ───── DOCKER LOGIN ─────
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+      # ───── BUILD IMAGES ─────
       - name: Build Backend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend
 
@@ -70,12 +77,14 @@ jobs:
           exit-code: '0'
           scanners: vuln
 
+      # ───── PUSH IMAGES ─────
       - name: Push Backend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
 
       - name: Push Frontend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
+      # ───── UPDATE MANIFESTS ─────
       - name: Update Backend Manifest
         run: |
           sed -i 's|image:.*backend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}"'|' manifests/backend-deployment.yaml
@@ -84,7 +93,7 @@ jobs:
         run: |
           sed -i 's|image:.*frontend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}"'|' manifests/frontend-deployment.yaml
 
-      # ── Create develop-ci → develop PR ──────────────────────────────
+      # ───── CREATE develop-ci → develop PR ─────
       - name: Create PR from develop-ci to develop
         id: create_pr
         uses: peter-evans/create-pull-request@v5
@@ -94,12 +103,12 @@ jobs:
           branch: develop-ci-${{ github.sha }}
           base: develop
           title: "CI: Update images to ${{ github.sha }}"
-          body: "This PR was automatically created by CI to update backend and frontend image tags."
+          body: "Automatically created PR to update image tags."
           draft: false
           add-paths: |
             manifests/
 
-      # ── Auto-merge develop-ci → develop PR ──────────────────────────
+      # ───── AUTO MERGE develop-ci → develop ─────
       - name: Enable auto-merge on develop-ci PR
         if: steps.create_pr.outputs.pull-request-number != ''
         env:
@@ -110,31 +119,29 @@ jobs:
             --merge \
             --repo ${{ github.repository }}
 
-      # ── Wait for develop-ci → develop PR to be merged ───────────────
-      # Polls every 15s for up to 10 minutes before giving up.
+      # ───── WAIT FOR MERGE ─────
       - name: Wait for develop-ci PR to be merged
         if: steps.create_pr.outputs.pull-request-number != ''
         env:
           GH_TOKEN: ${{ secrets.CI_SUPER_USER }}
         run: |
           PR_NUMBER=${{ steps.create_pr.outputs.pull-request-number }}
-          echo "Waiting for PR #$PR_NUMBER to be merged into develop..."
+          echo "Waiting for PR #$PR_NUMBER to merge..."
           for i in $(seq 1 40); do
             STATE=$(gh pr view $PR_NUMBER \
               --repo ${{ github.repository }} \
-              --json state,mergedAt \
+              --json state \
               --jq '.state')
-            echo "Attempt $i/40 — PR state: $STATE"
             if [ "$STATE" = "MERGED" ]; then
-              echo "PR #$PR_NUMBER merged successfully."
+              echo "PR merged."
               exit 0
             fi
             sleep 15
           done
-          echo "Timed out waiting for PR #$PR_NUMBER to merge."
+          echo "Timed out waiting for PR merge."
           exit 1
 
-      # ── STEP 4: Raise PR from develop → main (no auto-merge) ────────────────
+      # ───── CREATE develop → main PR (Manual Merge) ─────
       - name: Create PR from develop to main
         if: steps.create_pr.outputs.pull-request-number != ''
         uses: peter-evans/create-pull-request@v5
@@ -146,9 +153,7 @@ jobs:
           body: |
             ## Release PR
 
-            This PR was automatically raised by CI after the image tag update was merged into `develop`.
-
-            **Commit:** `${{ github.sha }}`
+            Commit: ${{ github.sha }}
 
             Please review and merge manually to promote to production.
           draft: false

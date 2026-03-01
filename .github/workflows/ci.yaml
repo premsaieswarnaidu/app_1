@@ -142,18 +142,26 @@ jobs:
           exit 1
 
       # ───── CREATE develop → main PR (Manual Merge) ─────
-      - name: Create PR from develop to main
-        if: steps.create_pr.outputs.pull-request-number != ''
+      - name: Create Release PR to main
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
-          branch: develop
+          branch: release-${{ github.sha }}
           base: main
-          title: "Release: promote develop to main (${{ github.sha }})"
+          commit-message: "release: promote images ${{ github.sha }}"
+          title: "Release: Promote to main (${{ github.sha }})"
           body: |
-            ## Release PR
+            ## Release Promotion
 
-            Commit: ${{ github.sha }}
+            This PR was automatically created by CI.
 
-            Please review and merge manually to promote to production.
+            **Commit SHA:** `${{ github.sha }}`
+
+            Changes:
+            - Updated backend image tag
+            - Updated frontend image tag
+
+            Please review and merge to deploy to production.
           draft: false
+          add-paths: |
+            manifests/

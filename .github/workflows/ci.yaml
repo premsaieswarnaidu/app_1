@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Git Identity
         run: |
@@ -30,6 +32,7 @@ jobs:
         with:
           node-version: 20
 
+      # ───── BACKEND ─────
       - name: Install Backend Dependencies
         run: cd backend && npm install
 
@@ -39,20 +42,23 @@ jobs:
       - name: Run Backend Unit & Integration Tests
         run: cd backend && npm test
 
+      # ───── FRONTEND ─────
       - name: Install Frontend Dependencies
         run: cd frontend && npm install
 
       - name: Build Frontend
         run: cd frontend && npm run build
 
+      # ───── DOCKER LOGIN ─────
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+      # ───── BUILD IMAGES ─────
       - name: Build Backend Image
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ./backend
 
       - name: Scan Backend Image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
           format: table
@@ -63,19 +69,21 @@ jobs:
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }} ./frontend
 
       - name: Scan Frontend Image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
           format: table
           exit-code: '0'
           scanners: vuln
 
+      # ───── PUSH IMAGES ─────
       - name: Push Backend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
 
       - name: Push Frontend Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
 
+      # ───── UPDATE MANIFESTS ─────
       - name: Update Backend Manifest
         run: |
           sed -i 's|image:.*backend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}"'|' manifests/backend-deployment.yaml
@@ -84,24 +92,75 @@ jobs:
         run: |
           sed -i 's|image:.*frontend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}"'|' manifests/frontend-deployment.yaml
 
-      - name: Create PR from CI branch
+      # ───── CREATE develop-ci → develop PR ─────
+      - name: Create PR from develop-ci to develop
         id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
-          commit-message: "Update images via CI"
+          commit-message: "ci: update image tags to ${{ github.sha }}"
           branch: develop-ci-${{ github.sha }}
           base: develop
           title: "CI: Update images to ${{ github.sha }}"
-          body: "This PR was automatically created by CI to update backend and frontend images."
+          body: "Automatically created PR to update image tags."
           draft: false
           add-paths: |
             manifests/
 
-      - name: Merge develop into main
-        if: ${{ steps.create_pr.outputs.pull-request-number }}
+      # ───── AUTO MERGE develop-ci → develop ─────
+      - name: Enable auto-merge on develop-ci PR
+        if: steps.create_pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.CI_SUPER_USER }}
         run: |
-          git fetch origin main
-          git checkout main
-          git merge --no-ff develop -m "Merge develop into main after successful CI" --allow-unrelated-histories
-          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} main
+          gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
+            --auto \
+            --merge \
+            --repo ${{ github.repository }}
+
+      # ───── WAIT FOR MERGE ─────
+      - name: Wait for develop-ci PR to be merged
+        if: steps.create_pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.CI_SUPER_USER }}
+        run: |
+          PR_NUMBER=${{ steps.create_pr.outputs.pull-request-number }}
+          echo "Waiting for PR #$PR_NUMBER to merge..."
+          for i in $(seq 1 40); do
+            STATE=$(gh pr view $PR_NUMBER \
+              --repo ${{ github.repository }} \
+              --json state \
+              --jq '.state')
+            if [ "$STATE" = "MERGED" ]; then
+              echo "PR merged."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for PR merge."
+          exit 1
+
+      # ───── CREATE develop → main PR ─────
+      - name: Create Release PR to main
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.CI_SUPER_USER }}
+          branch: release-${{ github.sha }}
+          base: main
+          commit-message: "release: promote images ${{ github.sha }}"
+          title: "Release: Promote to main (${{ github.sha }})"
+          body: |
+            ## Release Promotion
+
+            This PR was automatically created by CI.
+
+            **Commit SHA:** `${{ github.sha }}`
+
+            Changes:
+            - Updated backend image tag
+            - Updated frontend image tag
+
+            Please review and merge to deploy to production.
+          draft: false
+          add-paths: |
+            manifests/

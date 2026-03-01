@@ -84,24 +84,71 @@ jobs:
         run: |
           sed -i 's|image:.*frontend.*|image: '"${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}"'|' manifests/frontend-deployment.yaml
 
-      - name: Create PR from CI branch
+      # ── Create develop-ci → develop PR ──────────────────────────────
+      - name: Create PR from develop-ci to develop
         id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.CI_SUPER_USER }}
-          commit-message: "Update images via CI"
+          commit-message: "ci: update image tags to ${{ github.sha }}"
           branch: develop-ci-${{ github.sha }}
           base: develop
           title: "CI: Update images to ${{ github.sha }}"
-          body: "This PR was automatically created by CI to update backend and frontend images."
+          body: "This PR was automatically created by CI to update backend and frontend image tags."
           draft: false
           add-paths: |
             manifests/
 
-      - name: Merge develop into main
-        if: ${{ steps.create_pr.outputs.pull-request-number }}
+      # ── Auto-merge develop-ci → develop PR ──────────────────────────
+      - name: Enable auto-merge on develop-ci PR
+        if: steps.create_pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.CI_SUPER_USER }}
         run: |
-          git fetch origin main
-          git checkout main
-          git merge --no-ff develop -m "Merge develop into main after successful CI" --allow-unrelated-histories
-          git push https://x-access-token:${{ secrets.CI_SUPER_USER }}@github.com/${{ github.repository }} main
+          gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
+            --auto \
+            --merge \
+            --repo ${{ github.repository }}
+
+      # ── Wait for develop-ci → develop PR to be merged ───────────────
+      # Polls every 15s for up to 10 minutes before giving up.
+      - name: Wait for develop-ci PR to be merged
+        if: steps.create_pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.CI_SUPER_USER }}
+        run: |
+          PR_NUMBER=${{ steps.create_pr.outputs.pull-request-number }}
+          echo "Waiting for PR #$PR_NUMBER to be merged into develop..."
+          for i in $(seq 1 40); do
+            STATE=$(gh pr view $PR_NUMBER \
+              --repo ${{ github.repository }} \
+              --json state,mergedAt \
+              --jq '.state')
+            echo "Attempt $i/40 — PR state: $STATE"
+            if [ "$STATE" = "MERGED" ]; then
+              echo "PR #$PR_NUMBER merged successfully."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for PR #$PR_NUMBER to merge."
+          exit 1
+
+      # ── STEP 4: Raise PR from develop → main (no auto-merge) ────────────────
+      - name: Create PR from develop to main
+        if: steps.create_pr.outputs.pull-request-number != ''
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.CI_SUPER_USER }}
+          branch: develop
+          base: main
+          title: "Release: promote develop to main (${{ github.sha }})"
+          body: |
+            ## Release PR
+
+            This PR was automatically raised by CI after the image tag update was merged into `develop`.
+
+            **Commit:** `${{ github.sha }}`
+
+            Please review and merge manually to promote to production.
+          draft: false
